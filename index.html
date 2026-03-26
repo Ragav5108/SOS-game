@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOS - Online Multiplayer</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+        :root {
+            --bg-color: #87CEEB;
+            --board-bg: #FFFACD;
+            --primary: #FFA500;
+            --secondary: #FF6347;
+            --accent: #32CD32;
+            --text: #2c3e50;
+            --border: 4px solid #2c3e50;
+            --shadow: 6px 6px 0px #2c3e50;
+            --timer-warning: #ff4757;
+        }
+
+        body {
+            font-family: 'Fredoka One', cursive;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: var(--bg-color);
+            z-index: 10;
+        }
+
+        .screen.active { display: flex; animation: fadeIn 0.5s; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        .logo {
+            font-size: 5rem;
+            color: var(--secondary);
+            text-shadow: 4px 4px 0px #fff, 6px 6px 0px #2c3e50;
+            margin-bottom: 20px;
+            transform: rotate(-5deg);
+        }
+
+        .menu-card {
+            background: #fff;
+            padding: 30px;
+            border: var(--border);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .big-btn {
+            background: var(--primary);
+            color: white;
+            border: var(--border);
+            box-shadow: 4px 4px 0px #2c3e50;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.5rem;
+            padding: 15px 30px;
+            margin: 10px 0;
+            width: 100%;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .big-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #2c3e50; }
+        .big-btn.secondary { background: var(--secondary); }
+        .big-btn.accent { background: var(--accent); }
+        .big-btn.disabled { background: #ccc; cursor: not-allowed; }
+
+        .room-id-display {
+            background: #f0f0f0;
+            border: 2px dashed #2c3e50;
+            padding: 15px;
+            font-size: 2rem;
+            letter-spacing: 5px;
+            margin: 20px 0;
+            border-radius: 10px;
+            color: var(--secondary);
+            word-break: break-all;
+        }
+
+        .share-main-btn {
+            background: #25D366;
+            color: white;
+            border: var(--border);
+            box-shadow: 4px 4px 0px #2c3e50;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.2rem;
+            padding: 15px;
+            width: 100%;
+            border-radius: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .share-main-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #2c3e50; }
+
+        .input-field {
+            width: 80%; padding: 15px; font-size: 1.2rem; border: var(--border);
+            border-radius: 10px; text-align: center; font-family: 'Fredoka One', cursive;
+            margin-bottom: 15px; text-transform: uppercase;
+        }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 100;
+            display: none; align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: #fff; border: var(--border); border-radius: 20px;
+            padding: 20px; width: 90%; max-width: 350px;
+            box-shadow: var(--shadow); text-align: center;
+            animation: popIn 0.3s;
+        }
+        @keyframes popIn { from { transform: scale(0.5); } to { transform: scale(1); } }
+        
+        .app-option {
+            display: flex; align-items: center; gap: 10px;
+            background: #f0f0f0; border: 2px solid #2c3e50;
+            padding: 10px; margin: 5px 0; border-radius: 10px;
+            cursor: pointer; font-family: 'Fredoka One';
+            transition: background 0.2s;
+        }
+        .app-option:hover { background: #e0e0e0; }
+        .app-icon { width: 30px; height: 30px; border-radius: 5px; display:flex; align-items:center; justify-content:center; color:white; font-size:1.2rem; }
+
+        .waiting-room {
+            background: #fff;
+            border: var(--border);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .player-slot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f0f0f0;
+            border: 2px solid #2c3e50;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+
+        .player-slot.filled {
+            background: #98FB98;
+        }
+
+        .player-slot.empty {
+            background: #f0f0f0;
+        }
+
+        .status-dot {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            border: 2px solid #2c3e50;
+        }
+
+        .status-dot.online { background: #32CD32; }
+        .status-dot.offline { background: #ccc; }
+        .status-dot.connecting { background: #FFA500; animation: pulse 1s infinite; }
+
+        @keyframes pulse { 50% { opacity: 0.5; } }
+
+        .connection-status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+
+        .connection-status.connecting { background: #FFFACD; color: #FFA500; }
+        .connection-status.connected { background: #98FB98; color: #32CD32; }
+        .connection-status.error { background: #ffcccc; color: #ff4757; }
+
+        #game-screen { justify-content: flex-start; padding-top: 20px; overflow-y: auto; }
+
+        .top-bar {
+            display: flex; justify-content: space-between; width: 95%; margin-bottom: 10px;
+        }
+
+        .back-btn {
+            background: #fff; border: var(--border); padding: 5px 15px;
+            border-radius: 8px; cursor: pointer; font-size: 1rem;
+            box-shadow: 2px 2px 0px #2c3e50;
+        }
+
+        .scoreboard {
+            display: flex; gap: 15px; margin-bottom: 15px; background: #fff;
+            padding: 10px 20px; border: var(--border); border-radius: 15px;
+            box-shadow: var(--shadow);
+        }
+
+        .player-score {
+            text-align: center; padding: 10px; border-radius: 10px;
+            border: 2px solid #2c3e50; min-width: 80px;
+        }
+
+        .player-score.current { background-color: #98FB98; transform: scale(1.1); }
+
+        .timer-container {
+            width: 100%; max-width: 300px; height: 20px;
+            background: #ddd; border: 2px solid #2c3e50;
+            border-radius: 10px; margin: 10px 0; overflow: hidden;
+            position: relative;
+        }
+
+        .timer-bar {
+            height: 100%; background: var(--accent); width: 100%;
+            transition: width 1s linear, background 0.3s;
+        }
+
+        .timer-text {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.8rem; color: #2c3e50; z-index: 2;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(8, 40px);
+            grid-template-rows: repeat(8, 40px);
+            gap: 4px;
+            background: #2c3e50;
+            padding: 4px;
+            border-radius: 10px;
+            border: var(--border);
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+
+        .cell {
+            width: 40px; height: 40px; background: #FFFFFF;
+            border: 2px solid #2c3e50; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; cursor: pointer;
+        }
+        
+        .cell.filled { cursor: default; }
+        .cell.sos-highlight { background-color: #98FB98; animation: pop 0.3s; }
+        .letter-s { color: #FF4500; }
+        .letter-o { color: #1E90FF; }
+
+        .controls {
+            display: flex; gap: 15px; align-items: center; background: #fff;
+            padding: 10px; border-radius: 15px; border: var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .letter-btn {
+            width: 50px; height: 50px; font-size: 1.5rem; border-radius: 50%;
+            border: var(--border); cursor: pointer; background: #fff;
+        }
+        .letter-btn.selected { background: var(--primary); color: white; transform: scale(1.1); }
+        .letter-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .status-msg {
+            margin: 10px 0; font-size: 1.2rem; background: #fff;
+            padding: 5px 15px; border-radius: 20px; border: 2px solid #2c3e50;
+        }
+
+        .opponent-typing {
+            font-size: 0.9rem;
+            color: #666;
+            font-style: italic;
+            margin-top: 5px;
+        }
+
+        @keyframes pop { 50% { transform: scale(1.2); } }
+
+        @media (max-width: 400px) {
+            .grid-container { grid-template-columns: repeat(8, 32px); grid-template-rows: repeat(8, 32px); }
+            .cell { width: 32px; height: 32px; font-size: 1.2rem; }
+            .logo { font-size: 3.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SCREEN 1: MAIN MENU -->
+    <div id="screen-menu" class="screen active">
+        <div class="logo">SOS</div>
+        <div class="menu-card">
+            <button class="big-btn" onclick="showScreen('screen-modes')">Play Game</button>
+            <button class="big-btn secondary" onclick="alert('Rules:\n1. Create S-O-S horizontally, vertically, or diagonally.\n2. Each SOS pattern = +1 Point\n3. Multiple patterns in one move = Multiple points!\n4. If you score, you play again!\n5. You have 30 seconds per turn.\n6. Most points wins.')">How to Play</button>
+        </div>
+    </div>
+
+    <!-- SCREEN 2: MODE SELECTION -->
+    <div id="screen-modes" class="screen">
+        <div class="menu-card">
+            <h2>Select Mode</h2>
+            <button class="big-btn accent" onclick="setupWorldMode()">🌍 Online Multiplayer</button>
+            <button class="big-btn" onclick="setupLocalMode()">👥 Local (Same Device)</button>
+            <button class="big-btn secondary" onclick="setupComputerMode()">🤖 Vs Computer</button>
+            <button class="big-btn" style="background:#ccc; color:#333; margin-top:20px;" onclick="showScreen('screen-menu')">Back</button>
+        </div>
+    </div>
+
+    <!-- SCREEN 3: WORLD MODE - ROOM SETUP -->
+    <div id="screen-world" class="screen">
+        <div class="menu-card">
+            <h2>Online Multiplayer</h2>
+            <p>Play with a friend on different devices!</p>
+            
+            <div id="room-setup-section">
+                <button class="big-btn accent" onclick="createRoom()">Create Room</button>
+                <div style="margin: 15px 0; font-weight:bold;">- OR -</div>
+                <input type="text" id="join-room-input" class="input-field" placeholder="Enter Room ID" maxlength="50">
+                <button class="big-btn" onclick="joinRoom()">Join Room</button>
+            </div>
+
+            <div id="connection-status" class="connection-status" style="display:none;"></div>
+
+            <button class="big-btn" style="background:#ccc; color:#333; margin-top:20px;" onclick="showScreen('screen-modes')">Back</button>
+        </div>
+    </div>
+
+    <!-- SCREEN 4: WAITING ROOM -->
+    <div id="screen-waiting" class="screen">
+        <div class="waiting-room">
+            <h2>Room ID</h2>
+            <div class="room-id-display" id="display-room-id">------</div>
+            
+            <div class="connection-status connecting" id="waiting-status">
+                🔗 Connecting to server...
+            </div>
+
+            <p>Share this ID with your friend!</p>
+            
+            <div class="player-slot filled" id="slot-p1">
+                <span>👤 You (Player 1)</span>
+                <div class="status-dot online"></div>
+            </div>
+            
+            <div class="player-slot empty" id="slot-p2">
+                <span>👤 Player 2</span>
+                <div class="status-dot offline" id="p2-status-dot"></div>
+            </div>
+
+            <button class="big-btn share-main-btn" onclick="handleShare()">
+                <span>📤 Share Room ID</span>
+            </button>
+            <p style="font-size:0.8rem; color:#666;">Send to your friend to join!</p>
+
+            <button class="big-btn" style="background:#ccc; color:#333; margin-top:20px;" onclick="leaveRoom()">Leave Room</button>
+        </div>
+    </div>
+
+    <!-- SHARE MODAL -->
+    <div id="share-modal" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content">
+            <h3>Share Via:</h3>
+            <div class="app-option" onclick="shareSpecific('whatsapp')">
+                <div class="app-icon" style="background:#25D366">W</div> WhatsApp
+            </div>
+            <div class="app-option" onclick="shareSpecific('messenger')">
+                <div class="app-icon" style="background:#0088FF">M</div> Messenger
+            </div>
+            <div class="app-option" onclick="shareSpecific('telegram')">
+                <div class="app-icon" style="background:#0088cc">T</div> Telegram
+            </div>
+            <div class="app-option" onclick="shareSpecific('sms')">
+                <div class="app-icon" style="background:#FFA500">S</div> SMS / Text
+            </div>
+            <div class="app-option" onclick="shareSpecific('copy')">
+                <div class="app-icon" style="background:#333">C</div> Copy ID
+            </div>
+            <button class="big-btn secondary" style="margin-top:10px; font-size:1rem; padding:10px;" onclick="document.getElementById('share-modal').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <!-- SCREEN 5: GAME BOARD -->
+    <div id="screen-game" class="screen">
+        <div class="top-bar">
+            <button class="back-btn" onclick="quitGame()">Quit</button>
+            <div id="game-mode-label" style="font-size:1.2rem; align-self:center;">Online</div>
+        </div>
+
+        <div class="scoreboard">
+            <div class="player-score current" id="p1-score-box">
+                <div style="color:#FF4500">Player 1</div>
+                <div id="score-p1">0</div>
+            </div>
+            <div class="player-score" id="p2-score-box">
+                <div style="color:#1E90FF">Player 2</div>
+                <div id="score-p2">0</div>
+            </div>
+        </div>
+
+        <div class="timer-container">
+            <div class="timer-bar" id="timer-bar"></div>
+            <div class="timer-text" id="timer-text">30s</div>
+        </div>
+
+        <div class="status-msg" id="status-msg">Your Turn</div>
+        <div class="opponent-typing" id="opponent-status"></div>
+
+        <div class="grid-container" id="board"></div>
+
+        <div class="controls">
+            <span>Select:</span>
+            <button class="letter-btn selected" id="btn-s" onclick="selectLetter('S')">S</button>
+            <button class="letter-btn" id="btn-o" onclick="selectLetter('O')">O</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Navigation Logic ---
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        // --- PeerJS Connection Variables ---
+        let peer = null;
+        let conn = null;
+        let myPlayerId = null;
+        let opponentId = null;
+        let isHost = false;
+
+        // --- Game State ---
+        const BOARD_SIZE = 8;
+        const TURN_TIME = 30;
+        let board = [];
+        let currentPlayer = 1;
+        let scores = { 1: 0, 2: 0 };
+        let gameMode = 'local';
+        let selectedLetter = 'S';
+        let gameOver = false;
+        let sosLines = [];
+        let currentRoomId = null;
+        let timeLeft = TURN_TIME;
+        let timerInterval = null;
+        let myTurn = true;
+
+        // --- Mode Setup Functions ---
+        function setupLocalMode() {
+            gameMode = 'local';
+            document.getElementById('game-mode-label').innerText = "Local Multiplayer";
+            initGame();
+            showScreen('screen-game');
+        }
+
+        function setupComputerMode() {
+            gameMode = 'computer';
+            document.getElementById('game-mode-label').innerText = "Vs Computer";
+            initGame();
+            showScreen('screen-game');
+        }
+
+        function setupWorldMode() {
+            showScreen('screen-world');
+            document.getElementById('room-setup-section').style.display = 'block';
+            document.getElementById('join-room-input').value = '';
+            document.getElementById('connection-status').style.display = 'none';
+        }
+
+        // --- PeerJS Connection Logic ---
+        function initPeer() {
+            return new Promise((resolve, reject) => {
+                const statusEl = document.getElementById('connection-status');
+                statusEl.style.display = 'block';
+                statusEl.className = 'connection-status connecting';
+                statusEl.innerText = '🔗 Connecting to server...';
+
+                peer = new Peer(null, {
+                    debug: 2
+                });
+
+                peer.on('open', (id) => {
+                    console.log('My peer ID is: ' + id);
+                    statusEl.className = 'connection-status connected';
+                    statusEl.innerText = '✅ Connected!';
+                    resolve(id);
+                });
+
+                peer.on('error', (err) => {
+                    console.error('PeerJS Error:', err);
+                    statusEl.className = 'connection-status error';
+                    statusEl.innerText = '❌ Connection Error: ' + err.type;
+                    reject(err);
+                });
+            });
+        }
+
+        async function createRoom() {
+            try {
+                const peerId = await initPeer();
+                currentRoomId = peerId;
+                isHost = true;
+                myPlayerId = 1;
+                
+                document.getElementById('display-room-id').innerText = currentRoomId;
+                document.getElementById('waiting-status').style.display = 'block';
+                document.getElementById('waiting-status').className = 'connection-status connecting';
+                document.getElementById('waiting-status').innerText = '⏳ Waiting for Player 2...';
+                
+                // Listen for incoming connections
+                peer.on('connection', (connection) => {
+                    conn = connection;
+                    setupConnection();
+                    
+                    document.getElementById('slot-p2').classList.add('filled');
+                    document.getElementById('p2-status-dot').classList.remove('offline');
+                    document.getElementById('p2-status-dot').classList.add('online');
+                    document.getElementById('waiting-status').className = 'connection-status connected';
+                    document.getElementById('waiting-status').innerText = '✅ Player 2 Joined! Starting game...';
+                    
+                    setTimeout(() => {
+                        startGame('world');
+                    }, 1500);
+                });
+
+                showScreen('screen-waiting');
+            } catch (err) {
+                alert('Failed to create room. Please try again.');
+            }
+        }
+
+        async function joinRoom() {
+            const roomId = document.getElementById('join-room-input').value.trim();
+            if (!roomId || roomId.length < 4) {
+                alert('Please enter a valid Room ID');
+                return;
+            }
+
+            try {
+                const peerId = await initPeer();
+                currentRoomId = roomId;
+                isHost = false;
+                myPlayerId = 2;
+                opponentId = roomId;
+
+                document.getElementById('display-room-id').innerText = currentRoomId;
+                document.getElementById('waiting-status').style.display = 'block';
+                document.getElementById('waiting-status').className = 'connection-status connecting';
+                document.getElementById('waiting-status').innerText = '🔗 Connecting to host...';
+
+                // Connect to host
+                conn = peer.connect(roomId);
+                setupConnection();
+
+                conn.on('open', () => {
+                    document.getElementById('slot-p2').classList.add('filled');
+                    document.getElementById('p2-status-dot').classList.remove('offline');
+                    document.getElementById('p2-status-dot').classList.add('online');
+                    document.getElementById('waiting-status').className = 'connection-status connected';
+                    document.getElementById('waiting-status').innerText = '✅ Connected! Waiting for host to start...';
+                });
+
+                showScreen('screen-waiting');
+            } catch (err) {
+                alert('Failed to join room. Please check the Room ID and try again.');
+            }
+        }
+
+        function setupConnection() {
+            conn.on('data', (data) => {
+                handlePeerData(data);
+            });
+
+            conn.on('close', () => {
+                alert('Opponent disconnected!');
+                quitGame();
+            });
+
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+                alert('Connection error occurred');
+            });
+        }
+
+        function handlePeerData(data) {
+            console.log('Received:', data);
+
+            switch (data.type) {
+                case 'game-start':
+                    startGame('world');
+                    break;
+                case 'move':
+                    // Opponent made a move
+                    board[data.r][data.c] = data.letter;
+                    const index = data.r * BOARD_SIZE + data.c;
+                    const cellEl = document.getElementById('board').children[index];
+                    cellEl.innerText = data.letter;
+                    cellEl.classList.add('filled');
+                    cellEl.classList.add(data.letter === 'S' ? 'letter-s' : 'letter-o');
+                    
+                    // Update scores if opponent scored
+                    if (data.scored) {
+                        scores[data.player] += data.points;
+                        document.getElementById(`score-p${data.player}`).innerText = scores[data.player];
+                    }
+                    
+                    // Update current player
+                    currentPlayer = data.nextPlayer;
+                    updateTurnIndicator();
+                    
+                    // Check win condition
+                    if (data.gameOver) {
+                        endGame(data.winner);
+                    } else if (!data.scored) {
+                        startTimer();
+                    }
+                    break;
+                case 'game-over':
+                    endGame(data.winner);
+                    break;
+                case 'timer-update':
+                    // Sync timer if needed
+                    break;
+            }
+        }
+
+        function sendPeerData(data) {
+            if (conn && conn.open) {
+                conn.send(data);
+            }
+        }
+
+        function leaveRoom() {
+            if (peer) {
+                peer.destroy();
+            }
+            if (conn) {
+                conn.close();
+            }
+            currentRoomId = null;
+            isHost = false;
+            opponentId = null;
+            showScreen('screen-world');
+        }
+
+        function startGame(mode) {
+            gameMode = mode;
+            document.getElementById('game-mode-label').innerText = "Online Multiplayer";
+            initGame();
+            showScreen('screen-game');
+
+            // If host, send game start signal
+            if (isHost && conn && conn.open) {
+                sendPeerData({ type: 'game-start' });
+            }
+        }
+
+        function quitGame() {
+            stopTimer();
+            if (gameMode === 'world') {
+                sendPeerData({ type: 'game-over', winner: myPlayerId === 1 ? 2 : 1 });
+            }
+            if (confirm("End game and return to menu?")) {
+                leaveRoom();
+                showScreen('screen-menu');
+            }
+        }
+
+        // --- Core Game Logic ---
+        function initGame() {
+            currentPlayer = 1;
+            scores = { 1: 0, 2: 0 };
+            gameOver = false;
+            sosLines = [];
+            document.getElementById('score-p1').innerText = '0';
+            document.getElementById('score-p2').innerText = '0';
+            myTurn = (myPlayerId === 1);
+            updateTurnIndicator();
+            initBoard();
+            document.getElementById('status-msg').innerText = myTurn ? "Your Turn" : "Opponent's Turn";
+            
+            if (myTurn) {
+                startTimer();
+            } else {
+                document.getElementById('opponent-status').innerText = "Opponent is thinking...";
+            }
+        }
+
+        function initBoard() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            board = [];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                let row = [];
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    row.push(null);
+                    let cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    cell.onclick = () => handleCellClick(r, c);
+                    boardEl.appendChild(cell);
+                }
+                board.push(row);
+            }
+        }
+
+        function selectLetter(letter) {
+            if (gameOver || !myTurn) return;
+            selectedLetter = letter;
+            document.getElementById('btn-s').classList.toggle('selected', letter === 'S');
+            document.getElementById('btn-o').classList.toggle('selected', letter === 'O');
+        }
+
+        function updateTurnIndicator() {
+            const p1Box = document.getElementById('p1-score-box');
+            const p2Box = document.getElementById('p2-score-box');
+            const msg = document.getElementById('status-msg');
+            const oppStatus = document.getElementById('opponent-status');
+
+            if (gameMode === 'world') {
+                // Online mode
+                if (currentPlayer === myPlayerId) {
+                    myTurn = true;
+                    p1Box.classList.toggle('current', myPlayerId === 1);
+                    p2Box.classList.toggle('current', myPlayerId === 2);
+                    msg.innerText = "Your Turn";
+                    msg.style.color = myPlayerId === 1 ? "#FF4500" : "#1E90FF";
+                    oppStatus.innerText = "";
+                    document.getElementById('btn-s').classList.remove('disabled');
+                    document.getElementById('btn-o').classList.remove('disabled');
+                } else {
+                    myTurn = false;
+                    p1Box.classList.toggle('current', myPlayerId === 2);
+                    p2Box.classList.toggle('current', myPlayerId === 1);
+                    msg.innerText = "Opponent's Turn";
+                    msg.style.color = myPlayerId === 1 ? "#1E90FF" : "#FF4500";
+                    oppStatus.innerText = "Opponent is thinking...";
+                    document.getElementById('btn-s').classList.add('disabled');
+                    document.getElementById('btn-o').classList.add('disabled');
+                }
+            } else {
+                // Local/Computer mode
+                if (currentPlayer === 1) {
+                    p1Box.classList.add('current');
+                    p2Box.classList.remove('current');
+                    msg.innerText = "Player 1's Turn";
+                    msg.style.color = "#FF4500";
+                } else {
+                    p1Box.classList.remove('current');
+                    p2Box.classList.add('current');
+                    msg.innerText = gameMode === 'computer' ? "Computer Thinking..." : "Player 2's Turn";
+                    msg.style.color = "#1E90FF";
+                }
+            }
+        }
+
+        // --- Timer Logic ---
+        function startTimer() {
+            if (!myTurn && gameMode === 'world') return;
+            
+            stopTimer();
+            timeLeft = TURN_TIME;
+            updateTimerUI();
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerUI();
+                
+                if (timeLeft <= 0) {
+                    stopTimer();
+                    handleTimeOut();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+        }
+
+        function updateTimerUI() {
+            const bar = document.getElementById('timer-bar');
+            const text = document.getElementById('timer-text');
+            const percentage = (timeLeft / TURN_TIME) * 100;
+            
+            bar.style.width = percentage + '%';
+            text.innerText = timeLeft + 's';
+
+            if (timeLeft <= 10) {
+                bar.style.background = 'var(--timer-warning)';
+                bar.style.animation = 'pop 0.5s infinite';
+            } else {
+                bar.style.background = 'var(--accent)';
+                bar.style.animation = 'none';
+            }
+        }
+
+        function handleTimeOut() {
+            if (gameOver) return;
+            
+            if (gameMode === 'world') {
+                document.getElementById('status-msg').innerText = "Time's Up!";
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                updateTurnIndicator();
+                
+                // Send timeout to opponent
+                sendPeerData({
+                    type: 'move',
+                    r: -1,
+                    c: -1,
+                    letter: '',
+                    player: myPlayerId,
+                    scored: false,
+                    points: 0,
+                    nextPlayer: currentPlayer,
+                    gameOver: false
+                });
+                
+                if (myTurn) {
+                    startTimer();
+                }
+            } else if (gameMode === 'computer' && currentPlayer === 2) {
+                const move = getRandomMove();
+                if(move) placeMove(move.r, move.c, move.letter);
+            } else {
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                updateTurnIndicator();
+                startTimer();
+            }
+        }
+
+        function handleCellClick(r, c) {
+            if (gameOver || board[r][c] !== null) return;
+            if (gameMode === 'computer' && currentPlayer === 2) return;
+            if (gameMode === 'world' && !myTurn) return;
+            
+            placeMove(r, c, selectedLetter);
+        }
+
+        function placeMove(r, c, letter) {
+            stopTimer();
+            board[r][c] = letter;
+            
+            const index = r * BOARD_SIZE + c;
+            const cellEl = document.getElementById('board').children[index];
+            cellEl.innerText = letter;
+            cellEl.classList.add('filled');
+            cellEl.classList.add(letter === 'S' ? 'letter-s' : 'letter-o');
+
+            // Count ALL SOS patterns created in this move
+            const pointsEarned = checkSOS(r, c, letter);
+
+            // Each SOS pattern = +1 Point
+            if (pointsEarned > 0) {
+                scores[currentPlayer] += pointsEarned;
+                document.getElementById(`score-p${currentPlayer}`).innerText = scores[currentPlayer];
+                document.getElementById('status-msg').innerText = `SOS! +${pointsEarned} Point(s). Play Again!`;
+                document.getElementById('status-msg').style.background = "#fff";
+                highlightSOSLines();
+                
+                // Send move to opponent
+                if (gameMode === 'world' && conn && conn.open) {
+                    sendPeerData({
+                        type: 'move',
+                        r: r,
+                        c: c,
+                        letter: letter,
+                        player: myPlayerId,
+                        scored: true,
+                        points: pointsEarned,
+                        nextPlayer: currentPlayer,
+                        gameOver: false
+                    });
+                }
+                
+                checkWinCondition();
+                
+                if(!gameOver) {
+                    // Same player gets another turn
+                    if (gameMode === 'world' && myTurn) {
+                        startTimer();
+                    } else if (gameMode === 'computer' && currentPlayer === 2) {
+                        setTimeout(computerMove, 1000);
+                    } else if (gameMode === 'local') {
+                        startTimer();
+                    }
+                }
+            } else {
+                // Switch turn
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                updateTurnIndicator();
+                
+                // Send move to opponent
+                if (gameMode === 'world' && conn && conn.open) {
+                    sendPeerData({
+                        type: 'move',
+                        r: r,
+                        c: c,
+                        letter: letter,
+                        player: myPlayerId,
+                        scored: false,
+                        points: 0,
+                        nextPlayer: currentPlayer,
+                        gameOver: false
+                    });
+                }
+                
+                checkWinCondition();
+                
+                if (!gameOver) {
+                    if (gameMode === 'world' && myTurn) {
+                        startTimer();
+                    } else if (gameMode === 'computer' && currentPlayer === 2) {
+                        setTimeout(computerMove, 800);
+                    } else if (gameMode === 'local') {
+                        startTimer();
+                    }
+                }
+            }
+        }
+
+        function checkWinCondition() {
+            let isFull = true;
+            for(let r=0; r<BOARD_SIZE; r++) {
+                for(let c=0; c<BOARD_SIZE; c++) {
+                    if(board[r][c] === null) isFull = false;
+                }
+            }
+
+            if (isFull) {
+                gameOver = true;
+                stopTimer();
+                let winner = "";
+                if (scores[1] > scores[2]) winner = "Player 1";
+                else if (scores[2] > scores[1]) winner = "Player 2";
+                else winner = "Draw";
+                
+                endGame(winner);
+            }
+        }
+
+        function endGame(winner) {
+            gameOver = true;
+            stopTimer();
+            
+            let winnerMsg = "";
+            if (winner === "Draw") {
+                winnerMsg = "It's a Draw!";
+            } else if (gameMode === 'world') {
+                winnerMsg = (winner === "Player 1" ? (myPlayerId === 1 ? "You Win!" : "You Lose!") : (myPlayerId === 2 ? "You Win!" : "You Lose!"));
+            } else if (gameMode === 'computer') {
+                winnerMsg = winner === "Player 1" ? "You Win!" : "Computer Wins!";
+            } else {
+                winnerMsg = winner + " Wins!";
+            }
+            
+            document.getElementById('status-msg').innerText = `Game Over! ${winnerMsg}`;
+            document.getElementById('status-msg').style.background = "#FFD700";
+            document.getElementById('opponent-status').innerText = "";
+
+            // Send game over to opponent
+            if (gameMode === 'world' && conn && conn.open) {
+                sendPeerData({
+                    type: 'game-over',
+                    winner: winner
+                });
+            }
+        }
+
+        function checkSOS(r, c, letter) {
+            let points = 0;
+            const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+            const getCell = (row, col) => {
+                if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return null;
+                return board[row][col];
+            };
+
+            if (letter === 'S') {
+                directions.forEach(([dr, dc]) => {
+                    if (getCell(r + dr, c + dc) === 'O' && getCell(r + dr * 2, c + dc * 2) === 'S') {
+                        points++;
+                        sosLines.push([[r, c], [r + dr, c + dc], [r + dr * 2, c + dc * 2]]);
+                    }
+                });
+            } else if (letter === 'O') {
+                directions.forEach(([dr, dc]) => {
+                    if (getCell(r - dr, c - dc) === 'S' && getCell(r + dr, c + dc) === 'S') {
+                        points++;
+                        sosLines.push([[r - dr, c - dc], [r, c], [r + dr, c + dc]]);
+                    }
+                });
+            }
+            return points;
+        }
+
+        function highlightSOSLines() {
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('sos-highlight'));
+            sosLines.forEach(line => {
+                line.forEach(([r, c]) => {
+                    const index = r * BOARD_SIZE + c;
+                    document.getElementById('board').children[index].classList.add('sos-highlight');
+                });
+            });
+        }
+
+        // --- Computer AI ---
+        function computerMove() {
+            if (gameOver) return;
+            let move = findBestMove('win');
+            if (!move) move = findBestMove('block');
+            if (!move) move = findBestMove('trap');
+            if (!move) move = findBestMove('center');
+            if (!move) move = getRandomMove();
+
+            if (move) {
+                placeMove(move.r, move.c, move.letter);
+            }
+        }
+
+        function findBestMove(strategy) {
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === null) {
+                        let scoreS = simulateMove(r, c, 'S');
+                        let scoreO = simulateMove(r, c, 'O');
+
+                        if (strategy === 'win') {
+                            if (scoreS > 0) return { r, c, letter: 'S' };
+                            if (scoreO > 0) return { r, c, letter: 'O' };
+                        } 
+                        else if (strategy === 'block') {
+                            if (simulateOpponentWin(r, c, 'S')) return { r, c, letter: 'S' };
+                            if (simulateOpponentWin(r, c, 'O')) return { r, c, letter: 'O' };
+                        }
+                        else if (strategy === 'trap') {
+                            if (createsTrap(r, c, 'S')) return { r, c, letter: 'S' };
+                        }
+                        else if (strategy === 'center') {
+                            if (r >= 2 && r <= 5 && c >= 2 && c <= 5) {
+                                return { r, c, letter: 'S' };
+                            }
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        function simulateMove(r, c, letter) {
+            board[r][c] = letter;
+            let score = checkSOS(r, c, letter);
+            board[r][c] = null;
+            return score;
+        }
+
+        function simulateOpponentWin(r, c, letter) {
+            board[r][c] = letter;
+            let opponentScore = 0;
+            
+            board[r][c] = 'S';
+            if(checkSOS(r, c, 'S') > 0) opponentScore++;
+            board[r][c] = null;
+
+            board[r][c] = 'O';
+            if(checkSOS(r, c, 'O') > 0) opponentScore++;
+            board[r][c] = null;
+
+            if (opponentScore > 0) return true;
+            return false;
+        }
+
+        function createsTrap(r, c, letter) {
+            board[r][c] = letter;
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+            let trapCount = 0;
+
+            directions.forEach(([dr, dc]) => {
+                if (getCellSafe(r + dr*2, c + dc*2) === 'S' && getCellSafe(r + dr, c + dc) === null) {
+                    trapCount++;
+                }
+                if (getCellSafe(r - dr*2, c - dc*2) === 'S' && getCellSafe(r - dr, c - dc) === null) {
+                    trapCount++;
+                }
+            });
+            
+            board[r][c] = null;
+            return trapCount > 0;
+        }
+
+        function getCellSafe(r, c) {
+            if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE) return null;
+            return board[r][c];
+        }
+
+        function getRandomMove() {
+            let emptyCells = [];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === null) emptyCells.push({r, c});
+                }
+            }
+            if (emptyCells.length === 0) return null;
+            const rand = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            return { r: rand.r, c: rand.c, letter: 'S' };
+        }
+
+        // --- Sharing Logic ---
+        function handleShare() {
+            const shareData = {
+                title: 'SOS Online Game',
+                text: `Join my SOS game! Room ID: ${currentRoomId}`,
+                url: window.location.href
+            };
+
+            if (navigator.share) {
+                navigator.share(shareData)
+                    .then(() => console.log('Shared successfully'))
+                    .catch((error) => console.log('Error sharing:', error));
+            } else {
+                document.getElementById('share-modal').style.display = 'flex';
+            }
+        }
+
+        function closeModal(e) {
+            if (e.target.id === 'share-modal') {
+                document.getElementById('share-modal').style.display = 'none';
+            }
+        }
+
+        function shareSpecific(app) {
+            const text = `Join my SOS game! Room ID: ${currentRoomId}\n\nClick to play: ${window.location.href}`;
+            let url = '';
+
+            if (app === 'whatsapp') {
+                url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+            } else if (app === 'messenger') {
+                url = `https://www.facebook.com/dialog/send?link=${encodeURIComponent(window.location.href)}&app_id=YOUR_APP_ID&redirect_uri=${encodeURIComponent(window.location.href)}`;
+            } else if (app === 'telegram') {
+                url = `https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(text)}`;
+            } else if (app === 'sms') {
+                url = `sms:?body=${encodeURIComponent(text)}`;
+            } else if (app === 'copy') {
+                copyRoomId();
+                document.getElementById('share-modal').style.display = 'none';
+                return;
+            }
+
+            if (url) {
+                window.open(url, '_blank');
+                document.getElementById('share-modal').style.display = 'none';
+            }
+        }
+
+        function copyRoomId() {
+            navigator.clipboard.writeText(currentRoomId).then(() => {
+                alert("Room ID Copied to Clipboard!\n\nShare it with your friend so they can join!");
+            });
+        }
+
+        // --- Cleanup on Page Close ---
+        window.addEventListener('beforeunload', () => {
+            if (peer) {
+                peer.destroy();
+            }
+            if (conn) {
+                conn.close();
+            }
+        });
+    </script>
+</body>
+</html>
