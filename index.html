@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOS - 10x10 Strategy Game</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #e74c3c;
+            --light: #ecf0f1;
+            --s-color: #3498db;
+            --o-color: #e67e22;
+            --scored-color: #e74c3c;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: ;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        #menu-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            position: absolute;
+            z-index: 100;
+        }
+
+        .menu-btn {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            background: white;
+            border: none;
+            border-radius: 5px;
+            color: var(--primary);
+            width: 250px;
+            transition: transform 0.2s;
+        }
+
+        .menu-btn:hover { transform: scale(1.05); }
+        .hidden { display: none !important; }
+
+        #game-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .player-card {
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            width: 45%;
+        }
+
+        .active-turn {
+            background-color: #d5f5e3;
+            border: 2px solid #2ecc71;
+        }
+
+        .timer-box {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 2px;
+            background-color: #bdc3c7;
+            border: 5px solid var(--primary);
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .cell.s { color: var(--s-color); }
+        .cell.o { color: var(--o-color); }
+        .cell.last-move { background-color: #f1c40f; }
+
+        .cell.scored {
+            background-color: #fadbd8 !important;
+            color: var(--scored-color) !important;
+            font-weight: 900;
+        }
+
+        /* Strike-through line across SOS pattern */
+        .strike-line {
+            position: absolute;
+            background: linear-gradient(90deg, var(--scored-color), #c0392b);
+            z-index: 100;
+            pointer-events: none;
+            border-radius: 3px;
+            box-shadow: 0 0 5px rgba(231, 76, 60, 0.5);
+        }
+
+        #controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .letter-btn {
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            border: 2px solid #ccc;
+            background: white;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+        }
+
+        .letter-btn.selected {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        #online-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        input { padding: 10px; width: 200px; margin-bottom: 10px; }
+        #status-msg { margin-top: 10px; font-style: italic; color: #7f8c8d; }
+
+        .share-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .action-btn {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            color: white;
+        }
+
+        .btn-copy { background-color: #34495e; }
+        .btn-share { background-color: #27ae60; }
+        .btn-copy:disabled, .btn-share:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen">
+        <h1>SOS GAME</h1>
+        <p>10x10 Grid • Form "SOS" to score</p>
+        <button class="menu-btn" onclick="startGame('local')">Local 1vs1</button>
+        <button class="menu-btn" onclick="startGame('computer')">Vs Computer (Strategic)</button>
+        <button class="menu-btn" onclick="showOnlineMenu()">Online 1vs1</button>
+    </div>
+
+    <div id="online-modal">
+        <div class="modal-content">
+            <h2>Online Multiplayer</h2>
+            
+            <div id="create-room-section">
+                <p>Host a game & share ID:</p>
+                <button class="menu-btn" onclick="createRoom()">Create Room</button>
+                
+                <div id="room-id-container" class="hidden" style="margin-top:15px; background:#f9f9f9; padding:10px; border-radius:5px;">
+                    <p style="margin:0 0 5px 0; font-size:0.9rem;">Room ID:</p>
+                    <div id="room-id-display" style="font-weight:bold; font-size:1.2rem; color:var(--accent); word-break: break-all;"></div>
+                    
+                    <div class="share-actions">
+                        <button class="action-btn btn-copy" id="btn-copy" onclick="copyId()" disabled>Copy ID</button>
+                        <button class="action-btn btn-share" id="btn-share" onclick="shareId()" disabled>Share</button>
+                    </div>
+                </div>
+            </div>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <div id="join-room-section">
+                <p>Join existing room:</p>
+                <input type="text" id="remote-id-input" placeholder="Enter Host ID">
+                <button class="menu-btn" onclick="joinRoom()">Join Room</button>
+            </div>
+
+            <button class="menu-btn" style="background:#e74c3c; color:white; margin-top:10px;" onclick="closeOnlineMenu()">Back</button>
+            <p id="network-status">Initializing Network...</p>
+        </div>
+    </div>
+
+    <div id="game-screen">
+        <header>
+            <div id="p1-card" class="player-card active-turn">
+                <h3>Player 1 (S)</h3>
+                <div class="score">Score: <span id="p1-score">0</span></div>
+            </div>
+            <div class="timer-box">
+                <span id="timer">30</span>s
+            </div>
+            <div id="p2-card" class="player-card">
+                <h3 id="p2-name">Player 2 (O)</h3>
+                <div class="score">Score: <span id="p2-score">0</span></div>
+            </div>
+        </header>
+
+        <div id="grid-container"></div>
+
+        <div id="controls">
+            <div id="selection-label">Select Letter:</div>
+            <button class="letter-btn selected" onclick="selectLetter('S')">S</button>
+            <button class="letter-btn" onclick="selectLetter('O')">O</button>
+        </div>
+        
+        <div id="status-msg"></div>
+        <button class="menu-btn" style="margin-top:20px; width:150px; font-size:1rem;" onclick="location.reload()">Exit Game</button>
+    </div>
+
+<script>
+    const GRID_SIZE = 10;
+    const CELL_SIZE = 40;
+    const CELL_GAP = 2;
+    let board = [];
+    let currentPlayer = 1;
+    let scores = { 1: 0, 2: 0 };
+    let selectedLetter = 'S';
+    let gameActive = false;
+    let timerInterval;
+    let timeLeft = 30;
+    let gameMode = 'local';
+    let isHost = false;
+    let aiThinking = false;
+    let scoredPatterns = [];
+    let peer = null;
+    let conn = null;
+
+    function initGrid() {
+        const container = document.getElementById('grid-container');
+        container.innerHTML = '';
+        board = [];
+        scoredPatterns = [];
+        for (let r = 0; r < GRID_SIZE; r++) {
+            let row = [];
+            for (let c = 0; c < GRID_SIZE; c++) {
+                row.push(null);
+                let cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.row = r;
+                cell.dataset.col = c;
+                cell.id = `cell-${r}-${c}`;
+                cell.onclick = () => handleCellClick(r, c);
+                container.appendChild(cell);
+            }
+            board.push(row);
+        }
+    }
+
+    function startGame(mode) {
+        gameMode = mode;
+        document.getElementById('menu-screen').classList.add('hidden');
+        document.getElementById('game-screen').style.display = 'flex';
+        
+        if (mode === 'computer') {
+            document.getElementById('p2-name').innerText = "Computer (Strategic)";
+        } else if (mode === 'online') {
+            document.getElementById('p2-name').innerText = "Opponent (O)";
+        } else {
+            document.getElementById('p2-name').innerText = "Player 2 (O)";
+        }
+
+        initGrid();
+        resetTurn();
+        startTimer();
+        gameActive = true;
+        aiThinking = false;
+    }
+
+    function selectLetter(letter) {
+        selectedLetter = letter;
+        document.querySelectorAll('.letter-btn').forEach(btn => {
+            btn.classList.remove('selected');
+            if(btn.innerText === letter) btn.classList.add('selected');
+        });
+    }
+
+    function handleCellClick(r, c) {
+        if (!gameActive) return;
+        if (aiThinking) return;
+        
+        if (gameMode === 'online' && !isHost && currentPlayer === 1) return; 
+        if (gameMode === 'online' && isHost && currentPlayer === 2) return;
+        if (gameMode === 'computer' && currentPlayer !== 1) return;
+        if (board[r][c] !== null) return;
+
+        placeMove(r, c, selectedLetter);
+
+        if (gameMode === 'online') {
+            conn.send({ type: 'move', r: r, c: c, letter: selectedLetter });
+        }
+    }
+
+    function placeMove(r, c, letter, isAI = false) {
+        board[r][c] = letter;
+        
+        const cell = document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+        cell.innerText = letter;
+        cell.classList.add(letter.toLowerCase());
+        cell.classList.add('last-move');
+        
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('last-move'));
+
+        const scoreResult = checkForSOS(r, c, letter);
+        const points = scoreResult.points;
+        const patterns = scoreResult.patterns;
+        
+        if (points > 0) {
+            scores[currentPlayer] += points;
+            updateScoreboard();
+            resetTimer(); 
+            document.getElementById('status-msg').innerText = `Point scored! +${points}`;
+            
+            patterns.forEach(pattern => {
+                highlightScoredPattern(pattern);
+            });
+            
+            if (gameMode === 'computer' && currentPlayer === 2) {
+                aiThinking = true;
+                setTimeout(computerMove, 1000);
+                return;
+            }
+        } else {
+            switchTurn();
+        }
+
+        checkWinCondition();
+    }
+
+    function highlightScoredPattern(pattern) {
+        pattern.cells.forEach((cell) => {
+            const cellEl = document.getElementById(`cell-${cell.r}-${cell.c}`);
+            cellEl.classList.add('scored');
+        });
+        drawStrikeLine(pattern);
+        scoredPatterns.push(pattern);
+    }
+
+    function drawStrikeLine(pattern) {
+        const container = document.getElementById('grid-container');
+        const cells = pattern.cells;
+        
+        // Get first and last cell of the pattern
+        const firstCell = document.getElementById(`cell-${cells[0].r}-${cells[0].c}`);
+        const lastCell = document.getElementById(`cell-${cells[cells.length - 1].r}-${cells[cells.length - 1].c}`);
+        
+        // Get positions relative to container
+        const containerRect = container.getBoundingClientRect();
+        const firstRect = firstCell.getBoundingClientRect();
+        const lastRect = lastCell.getBoundingClientRect();
+        
+        // Calculate center points of first and last cells
+        const x1 = firstRect.left - containerRect.left + firstRect.width / 2;
+        const y1 = firstRect.top - containerRect.top + firstRect.height / 2;
+        const x2 = lastRect.left - containerRect.left + lastRect.width / 2;
+        const y2 = lastRect.top - containerRect.top + lastRect.height / 2;
+        
+        // Calculate line length (distance between centers)
+        const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        
+        // Calculate angle in degrees
+        const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+        
+        // Create strike line element
+        const strikeLine = document.createElement('div');
+        strikeLine.classList.add('strike-line');
+        
+        // Set dimensions - make line extend beyond cells for visibility
+        strikeLine.style.height = '6px';
+        strikeLine.style.width = (length + 20) + 'px'; // Add extra length for better visibility
+        
+        // Position at center of first cell
+        strikeLine.style.left = (x1 - 10) + 'px';
+        strikeLine.style.top = (y1 - 3) + 'px';
+        
+        // Rotate around center point
+        strikeLine.style.transformOrigin = 'left center';
+        strikeLine.style.transform = `rotate(${angle}deg)`;
+        
+        container.appendChild(strikeLine);
+    }
+
+    function checkForSOS(r, c, letter) {
+        let points = 0;
+        let patterns = [];
+        const directions = [
+            { name: 'horizontal', dr: 0, dc: 1 },
+            { name: 'vertical', dr: 1, dc: 0 },
+            { name: 'diagonal-1', dr: 1, dc: 1 },
+            { name: 'diagonal-2', dr: 1, dc: -1 }
+        ];
+
+        if (letter === 'O') {
+            directions.forEach(dir => {
+                let r1 = r + dir.dr, c1 = c + dir.dc;
+                let r2 = r - dir.dr, c2 = c - dir.dc;
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === 'S' && board[r2][c2] === 'S') {
+                        points++;
+                        patterns.push({
+                            cells: [{r: r2, c: c2}, {r: r, c: c}, {r: r1, c: c1}],
+                            direction: dir.name
+                        });
+                    }
+                }
+            });
+        } else if (letter === 'S') {
+            directions.forEach(dir => {
+                let r1 = r + dir.dr, c1 = c + dir.dc;
+                let r2 = r + (dir.dr * 2), c2 = c + (dir.dc * 2);
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === 'O' && board[r2][c2] === 'S') {
+                        points++;
+                        patterns.push({
+                            cells: [{r: r, c: c}, {r: r1, c: c1}, {r: r2, c: c2}],
+                            direction: dir.name
+                        });
+                    }
+                }
+            });
+        }
+        return { points, patterns };
+    }
+
+    function isValid(r, c) {
+        return r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE;
+    }
+
+    function switchTurn() {
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        updateTurnUI();
+        resetTimer();
+        document.getElementById('status-msg').innerText = "";
+        aiThinking = false;
+        
+        if (gameMode === 'computer' && currentPlayer === 2 && gameActive) {
+            aiThinking = true;
+            setTimeout(computerMove, 1000);
+        }
+    }
+
+    function updateTurnUI() {
+        const p1Card = document.getElementById('p1-card');
+        const p2Card = document.getElementById('p2-card');
+        
+        if (currentPlayer === 1) {
+            p1Card.classList.add('active-turn');
+            p2Card.classList.remove('active-turn');
+            document.getElementById('selection-label').innerText = "Select Letter:";
+            document.getElementById('controls').style.opacity = "1";
+            document.getElementById('controls').style.pointerEvents = "auto";
+        } else {
+            p1Card.classList.remove('active-turn');
+            p2Card.classList.add('active-turn');
+            
+            if (gameMode === 'computer' || (gameMode === 'online' && !isHost)) {
+                document.getElementById('selection-label').innerText = "Opponent's Turn";
+                document.getElementById('controls').style.opacity = "0.5";
+                document.getElementById('controls').style.pointerEvents = "none";
+            } else {
+                document.getElementById('selection-label').innerText = "Select Letter:";
+                document.getElementById('controls').style.opacity = "1";
+                document.getElementById('controls').style.pointerEvents = "auto";
+            }
+        }
+    }
+
+    function updateScoreboard() {
+        document.getElementById('p1-score').innerText = scores[1];
+        document.getElementById('p2-score').innerText = scores[2];
+    }
+
+    function resetTurn() {
+        currentPlayer = 1;
+        scores = { 1: 0, 2: 0 };
+        updateScoreboard();
+        updateTurnUI();
+        aiThinking = false;
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 30;
+        document.getElementById('timer').innerText = timeLeft;
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) switchTurn();
+        }, 1000);
+    }
+
+    function resetTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 30;
+        document.getElementById('timer').innerText = timeLeft;
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) switchTurn();
+        }, 1000);
+    }
+
+    function checkWinCondition() {
+        let full = true;
+        for(let r=0; r<GRID_SIZE; r++){
+            for(let c=0; c<GRID_SIZE; c++){
+                if(board[r][c] === null) full = false;
+            }
+        }
+
+        if (full) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            aiThinking = false;
+            let msg = "";
+            if (scores[1] > scores[2]) msg = "Player 1 Wins!";
+            else if (scores[2] > scores[1]) msg = "Player 2 Wins!";
+            else msg = "It's a Draw!";
+            alert(`Game Over! ${msg}`);
+        }
+    }
+
+    // === INTELLIGENT AI ===
+    function computerMove() {
+        if (!gameActive || currentPlayer !== 2) {
+            aiThinking = false;
+            return;
+        }
+
+        let emptySpots = [];
+        for(let r=0; r<GRID_SIZE; r++){
+            for(let c=0; c<GRID_SIZE; c++){
+                if(board[r][c] === null) emptySpots.push({r,c});
+            }
+        }
+
+        if(emptySpots.length === 0) {
+            aiThinking = false;
+            return;
+        }
+
+        let bestMove = null;
+        let bestScore = -Infinity;
+        let bestMoves = [];
+
+        for (let spot of emptySpots) {
+            ['S', 'O'].forEach(letter => {
+                let score = evaluateMoveWithPatternRecognition(spot.r, spot.c, letter);
+                
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = { r: spot.r, c: spot.c, letter: letter };
+                    bestMoves = [{ r: spot.r, c: spot.c, letter: letter }];
+                } else if (Math.abs(score - bestScore) < 15) {
+                    bestMoves.push({ r: spot.r, c: spot.c, letter: letter });
+                }
+            });
+        }
+
+        if (bestMoves.length > 1) {
+            bestMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        }
+
+        if (bestMove) {
+            placeMove(bestMove.r, bestMove.c, bestMove.letter, true);
+        }
+    }
+
+    function evaluateMoveWithPatternRecognition(r, c, letter) {
+        let score = 0;
+        board[r][c] = letter;
+
+        const scoreResult = checkForSOS(r, c, letter);
+        if (scoreResult.points > 0) {
+            const trapRisk = calculateTrapRisk(r, c, letter);
+            if (trapRisk <= 1) {
+                score += scoreResult.points * 3000;
+                score += 1000;
+            } else {
+                score += scoreResult.points * 1500;
+            }
+        }
+
+        const patternCompletion = findPatternCompletionOpportunities(r, c, letter);
+        score += patternCompletion * 800;
+
+        const patternCreation = createScoringPatterns(r, c, letter);
+        score += patternCreation * 600;
+
+        const letterStrategy = evaluateLetterStrategy(r, c, letter);
+        score += letterStrategy * 400;
+
+        const blockOpponent = blockOpponentPatterns(r, c, letter);
+        score += blockOpponent * 700;
+
+        const trapRisk = calculateTrapRisk(r, c, letter);
+        score -= trapRisk * 1000;
+
+        const positionValue = evaluatePositionValue(r, c, letter);
+        score += positionValue * 300;
+
+        const lookahead = calculateLookaheadScore(r, c, letter);
+        score += lookahead * 500;
+
+        board[r][c] = null;
+        score += Math.random() * 20;
+
+        return score;
+    }
+
+    function findPatternCompletionOpportunities(r, c, letter) {
+        let opportunities = 0;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+        if (letter === 'O') {
+            directions.forEach(dir => {
+                let r1 = r + dir[0], c1 = c + dir[1];
+                let r2 = r - dir[0], c2 = c - dir[1];
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === 'S' && board[r2][c2] === 'S') {
+                        opportunities += 5;
+                    }
+                }
+            });
+        }
+
+        if (letter === 'S') {
+            directions.forEach(dir => {
+                let r1 = r + dir[0], c1 = c + dir[1];
+                let r2 = r + (dir[0] * 2), c2 = c + (dir[1] * 2);
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === 'O' && board[r2][c2] === 'S') {
+                        opportunities += 5;
+                    }
+                    if (board[r1][c1] === 'O' && board[r2][c2] === null) {
+                        opportunities += 2;
+                    }
+                }
+            });
+        }
+
+        return opportunities;
+    }
+
+    function createScoringPatterns(r, c, letter) {
+        let patterns = 0;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+        if (letter === 'S') {
+            directions.forEach(dir => {
+                let r1 = r + dir[0], c1 = c + dir[1];
+                let r2 = r + (dir[0] * 2), c2 = c + (dir[1] * 2);
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === null && board[r2][c2] === null) {
+                        patterns += 1;
+                    }
+                    if (board[r1][c1] === null && board[r2][c2] === 'S') {
+                        patterns += 2;
+                    }
+                }
+            });
+        }
+
+        if (letter === 'O') {
+            directions.forEach(dir => {
+                let r1 = r + dir[0], c1 = c + dir[1];
+                let r2 = r - dir[0], c2 = c - dir[1];
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === null && board[r2][c2] === null) {
+                        patterns += 1;
+                    }
+                    if ((board[r1][c1] === 'S' && board[r2][c2] === null) ||
+                        (board[r1][c1] === null && board[r2][c2] === 'S')) {
+                        patterns += 2;
+                    }
+                }
+            });
+        }
+
+        return patterns;
+    }
+
+    function evaluateLetterStrategy(r, c, letter) {
+        let value = 0;
+        const emptyNeighbors = countEmptyNeighbors(r, c);
+        const sNeighbors = countLetterNeighbors(r, c, 'S');
+        const oNeighbors = countLetterNeighbors(r, c, 'O');
+
+        if (letter === 'S') {
+            if (emptyNeighbors >= 3) value += 2;
+            if (oNeighbors >= 1) value += 2;
+        }
+
+        if (letter === 'O') {
+            if (sNeighbors >= 2) value += 3;
+            if (sNeighbors === 1) value += 1;
+        }
+
+        return value;
+    }
+
+    function blockOpponentPatterns(r, c, letter) {
+        let blocked = 0;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+        directions.forEach(dir => {
+            let r1 = r + dir[0], c1 = c + dir[1];
+            let r2 = r + (dir[0] * 2), c2 = c + (dir[1] * 2);
+
+            if (isValid(r1, c1) && isValid(r2, c2)) {
+                if (board[r1][c1] === null && board[r2][c2] === 'S' && letter === 'S') {
+                    blocked += 2;
+                }
+                if (board[r1][c1] === 'S' && board[r2][c2] === null && letter === 'O') {
+                    blocked += 2;
+                }
+            }
+        });
+
+        return blocked;
+    }
+
+    function calculateTrapRisk(r, c, letter) {
+        let risk = 0;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+        if (letter === 'S') {
+            directions.forEach(dir => {
+                let r2 = r + (dir[0] * 2), c2 = c + (dir[1] * 2);
+                let rMid = r + dir[0], cMid = c + dir[1];
+                if (isValid(r2, c2) && isValid(rMid, cMid)) {
+                    if (board[r2][c2] === 'S' && board[rMid][cMid] === null) {
+                        risk += 3;
+                    }
+                }
+            });
+        }
+
+        if (letter === 'O') {
+            directions.forEach(dir => {
+                let r1 = r + dir[0], c1 = c + dir[1];
+                let r2 = r + (dir[0] * 2), c2 = c + (dir[1] * 2);
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === 'S' && board[r2][c2] === null) {
+                        risk += 2;
+                    }
+                }
+            });
+        }
+
+        return risk;
+    }
+
+    function evaluatePositionValue(r, c, letter) {
+        let value = 0;
+        const center = GRID_SIZE / 2;
+        const distanceFromCenter = Math.abs(r - center) + Math.abs(c - center);
+        
+        value += Math.max(0, 5 - distanceFromCenter);
+        
+        if (r === 0 || r === GRID_SIZE - 1) value -= 1;
+        if (c === 0 || c === GRID_SIZE - 1) value -= 1;
+
+        return value;
+    }
+
+    function calculateLookaheadScore(r, c, letter) {
+        let lookahead = 0;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+        directions.forEach(dir => {
+            let r1 = r + dir[0], c1 = c + dir[1];
+            let r2 = r + (dir[0] * 2), c2 = c + (dir[1] * 2);
+
+            if (isValid(r1, c1) && isValid(r2, c2) && board[r1][c1] === null) {
+                board[r1][c1] = letter === 'S' ? 'O' : 'S';
+                const nextScore = checkForSOS(r1, c1, board[r1][c1]);
+                if (nextScore.points > 0) {
+                    lookahead += nextScore.points;
+                }
+                board[r1][c1] = null;
+            }
+        });
+
+        return lookahead;
+    }
+
+    function countEmptyNeighbors(r, c) {
+        let count = 0;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+        directions.forEach(dir => {
+            let r1 = r + dir[0], c1 = c + dir[1];
+            if (isValid(r1, c1) && board[r1][c1] === null) count++;
+        });
+        return count;
+    }
+
+    function countLetterNeighbors(r, c, letter) {
+        let count = 0;
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+        directions.forEach(dir => {
+            let r1 = r + dir[0], c1 = c + dir[1];
+            if (isValid(r1, c1) && board[r1][c1] === letter) count++;
+        });
+        return count;
+    }
+
+    function showOnlineMenu() {
+        document.getElementById('online-modal').style.display = 'flex';
+        initPeer();
+    }
+
+    function closeOnlineMenu() {
+        document.getElementById('online-modal').style.display = 'none';
+    }
+
+    function initPeer() {
+        peer = new Peer();
+        peer.on('open', (id) => {
+            document.getElementById('network-status').innerText = "Network Ready.";
+        });
+        peer.on('connection', (c) => {
+            conn = c;
+            isHost = true;
+            setupConnectionHandlers();
+            document.getElementById('network-status').innerText = "Player Connected! Starting Game...";
+            setTimeout(() => {
+                closeOnlineMenu();
+                startGame('online');
+            }, 1000);
+        });
+    }
+
+    function createRoom() {
+        if(!peer) return;
+        const myId = peer.id;
+        document.getElementById('room-id-display').innerText = myId;
+        document.getElementById('room-id-container').classList.remove('hidden');
+        document.getElementById('network-status').innerText = "Waiting for opponent to join...";
+        document.getElementById('btn-copy').disabled = false;
+        document.getElementById('btn-share').disabled = false;
+    }
+
+    function joinRoom() {
+        const remoteId = document.getElementById('remote-id-input').value;
+        if(!remoteId) return alert("Enter an ID");
+        conn = peer.connect(remoteId);
+        isHost = false;
+        conn.on('open', () => {
+            document.getElementById('network-status').innerText = "Connected to Host!";
+            setupConnectionHandlers();
+            setTimeout(() => {
+                closeOnlineMenu();
+                startGame('online');
+            }, 1000);
+        });
+    }
+
+    function setupConnectionHandlers() {
+        conn.on('data', (data) => {
+            if (data.type === 'move') {
+                placeMove(data.r, data.c, data.letter);
+            }
+        });
+    }
+
+    function copyId() {
+        const idText = document.getElementById('room-id-display').innerText;
+        navigator.clipboard.writeText(idText).then(() => {
+            const btn = document.getElementById('btn-copy');
+            const originalText = btn.innerText;
+            btn.innerText = "Copied!";
+            setTimeout(() => { btn.innerText = originalText; }, 2000);
+        }).catch(err => {
+            alert("Failed to copy: " + err);
+        });
+    }
+
+    function shareId() {
+        const idText = document.getElementById('room-id-display').innerText;
+        const shareData = {
+            title: 'Join my SOS Game',
+            text: `Join my SOS game! Room ID: ${idText}`,
+            url: window.location.href
+        };
+        if (navigator.share) {
+            navigator.share(shareData)
+                .then(() => console.log('Shared successfully'))
+                .catch((error) => console.log('Error sharing', error));
+        } else {
+            copyId();
+            alert("Web Share not supported. ID copied to clipboard instead!");
+        }
+    }
+</script>
+</body>
+</html>
