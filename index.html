@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOS - Simple Cartoon</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #FFF5D7;
+            --primary: #4ECDC4;
+            --secondary: #FF6B6B;
+            --accent: #FFE66D;
+            --text: #292F36;
+            --border: #292F36;
+            --cell-size: 40px;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(var(--primary) 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+            color: var(--text);
+        }
+
+        h1, h2, h3 {
+            font-family: 'Fredoka One', cursive;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .btn {
+            font-family: 'Fredoka One', cursive;
+            padding: 12px 24px;
+            margin: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            background: white;
+            border: 3px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            box-shadow: 4px 4px 0px var(--border);
+            transition: all 0.1s;
+            text-transform: uppercase;
+        }
+
+        .btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px var(--border);
+        }
+
+        .btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px var(--border);
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-accent { background: var(--accent); color: var(--text); }
+
+        #menu-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100%;
+            position: absolute;
+            z-index: 100;
+            background: var(--bg-color);
+        }
+
+        #menu-screen h1 {
+            font-size: 3.5rem;
+            color: var(--secondary);
+            -webkit-text-stroke: 2px var(--border);
+            margin-bottom: 30px;
+            text-shadow: 4px 4px 0px rgba(0,0,0,0.1);
+        }
+
+        .hidden { display: none !important; }
+
+        #game-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            width: 100%;
+            max-width: 550px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px;
+            background: white;
+            padding: 10px;
+            border: 3px solid var(--border);
+            border-radius: 15px;
+            box-shadow: 4px 4px 0px var(--border);
+            align-items: center;
+        }
+
+        .player-card {
+            text-align: center;
+            padding: 8px;
+            border-radius: 10px;
+            width: 35%;
+            border: 2px solid transparent;
+        }
+
+        .active-turn {
+            background-color: var(--accent);
+            border-color: var(--border);
+            transform: scale(1.05);
+        }
+
+        .timer-box {
+            font-family: 'Fredoka One';
+            font-size: 1.8rem;
+            color: white;
+            background: var(--secondary);
+            border: 3px solid var(--border);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 3px 3px 0px var(--border);
+        }
+
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 3px;
+            background-color: var(--border);
+            border: 3px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            padding: 3px;
+            box-shadow: 6px 6px 0px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Fredoka One';
+            font-size: 1.4rem;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.1s;
+            border-radius: 4px;
+        }
+
+        .cell:hover {
+            background-color: #f0f0f0;
+            z-index: 5;
+        }
+
+        .cell.s { color: var(--primary); }
+        .cell.o { color: var(--secondary); }
+        
+        .cell.last-move { 
+            background-color: var(--accent); 
+            border: 2px solid var(--border);
+        }
+
+        .cell.scored {
+            background-color: #FF9F1C !important;
+            color: white !important;
+            border: 2px solid var(--border);
+            z-index: 4;
+        }
+
+        .strike-line {
+            position: absolute;
+            background: var(--text);
+            z-index: 100;
+            pointer-events: none;
+            border-radius: 4px;
+        }
+
+        #controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: 3px solid var(--border);
+            box-shadow: 4px 4px 0px var(--border);
+        }
+
+        .letter-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .letter-btn.selected {
+            background-color: var(--text);
+            color: white;
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px var(--border);
+        }
+
+        #status-msg {
+            margin-top: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            font-family: 'Fredoka One';
+            min-height: 30px;
+            text-align: center;
+        }
+
+        #online-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(41, 47, 54, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border: 4px solid var(--border);
+            border-radius: 20px;
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.2);
+        }
+
+        input {
+            padding: 10px;
+            width: 80%;
+            margin: 10px 0;
+            border: 3px solid var(--border);
+            border-radius: 10px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: bold;
+            outline: none;
+        }
+
+        .share-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .combo-text {
+            position: absolute;
+            font-family: 'Fredoka One';
+            font-size: 1.8rem;
+            color: #FF6B6B;
+            text-shadow: 2px 2px 0 #FFF, 3px 3px 0 #000;
+            z-index: 200;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            white-space: nowrap;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            50% { transform: translateY(-30px) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-60px) scale(1); opacity: 0; }
+        }
+
+        @media (max-width: 500px) {
+            :root { --cell-size: 32px; }
+            #menu-screen h1 { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen">
+        <h1>SOS</h1>
+        <button class="btn btn-primary" onclick="startGame('local')">👥 Local 1vs1</button>
+        <button class="btn btn-secondary" onclick="startGame('computer')">🤖 Vs Computer</button>
+        <button class="btn btn-accent" onclick="showOnlineMenu()">🌐 Online</button>
+    </div>
+
+    <div id="online-modal">
+        <div class="modal-content">
+            <h2>Online Play</h2>
+            
+            <div id="create-room-section">
+                <p>Host & Share ID:</p>
+                <button class="btn btn-primary" onclick="createRoom()">Create Room</button>
+                
+                <div id="room-id-container" class="hidden" style="margin-top:15px; background:#f9f9f9; padding:10px; border-radius:10px; border: 2px dashed var(--border);">
+                    <div id="room-id-display" style="font-family:'Fredoka One'; font-size:1.3rem; color:var(--secondary); word-break: break-all; margin: 10px 0;"></div>
+                    <div class="share-actions">
+                        <button class="btn btn-sm btn-secondary" id="btn-copy" onclick="copyId()" disabled>Copy</button>
+                        <button class="btn btn-sm btn-primary" id="btn-share" onclick="shareId()" disabled>Share</button>
+                    </div>
+                </div>
+            </div>
+
+            <hr style="border: 0; border-top: 2px dashed var(--border); margin: 20px 0;">
+
+            <div id="join-room-section">
+                <p>Join Room:</p>
+                <input type="text" id="remote-id-input" placeholder="Paste ID...">
+                <button class="btn btn-primary" onclick="joinRoom()">Join</button>
+            </div>
+
+            <button class="btn" style="margin-top:20px; background:#ccc;" onclick="closeOnlineMenu()">Back</button>
+            <p id="network-status" style="font-size:0.9rem; margin-top:10px; color:#666;">Connecting...</p>
+        </div>
+    </div>
+
+    <div id="game-screen">
+        <header>
+            <div id="p1-card" class="player-card active-turn">
+                <h3>Player 1</h3>
+                <div style="font-size: 1.5rem; font-family:'Fredoka One';"><span id="p1-score">0</span></div>
+            </div>
+            <div class="timer-box">
+                <span id="timer">30</span>
+            </div>
+            <div id="p2-card" class="player-card">
+                <h3 id="p2-name">Player 2</h3>
+                <div style="font-size: 1.5rem; font-family:'Fredoka One';"><span id="p2-score">0</span></div>
+            </div>
+        </header>
+
+        <div id="grid-container"></div>
+
+        <div id="controls">
+            <span style="font-weight:bold;">Pick:</span>
+            <button class="btn letter-btn selected" onclick="selectLetter('S')">S</button>
+            <button class="btn letter-btn" onclick="selectLetter('O')">O</button>
+        </div>
+        
+        <div id="status-msg"></div>
+        <button class="btn" style="margin-top:20px; font-size:0.9rem;" onclick="location.reload()">Exit</button>
+    </div>
+
+<script>
+    const GRID_SIZE = 10;
+    let board = [];
+    let currentPlayer = 1;
+    let scores = { 1: 0, 2: 0 };
+    let selectedLetter = 'S';
+    let gameActive = false;
+    let timerInterval;
+    let timeLeft = 30;
+    let gameMode = 'local';
+    let isHost = false;
+    let aiThinking = false;
+    let scoredPatterns = [];
+    let peer = null;
+    let conn = null;
+    let boardAnalysis = {}; // Store board state analysis
+
+    function initGrid() {
+        const container = document.getElementById('grid-container');
+        container.innerHTML = '';
+        board = [];
+        scoredPatterns = [];
+        boardAnalysis = {};
+        for (let r = 0; r < GRID_SIZE; r++) {
+            let row = [];
+            for (let c = 0; c < GRID_SIZE; c++) {
+                row.push(null);
+                let cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.row = r;
+                cell.dataset.col = c;
+                cell.id = `cell-${r}-${c}`;
+                cell.onclick = () => handleCellClick(r, c);
+                container.appendChild(cell);
+            }
+            board.push(row);
+        }
+    }
+
+    function startGame(mode) {
+        gameMode = mode;
+        document.getElementById('menu-screen').classList.add('hidden');
+        document.getElementById('game-screen').style.display = 'flex';
+        
+        if (mode === 'computer') document.getElementById('p2-name').innerText = "CPU";
+        else if (mode === 'online') document.getElementById('p2-name').innerText = "Opponent";
+        else document.getElementById('p2-name').innerText = "Player 2";
+
+        initGrid();
+        resetTurn();
+        startTimer();
+        gameActive = true;
+        aiThinking = false;
+    }
+
+    function selectLetter(letter) {
+        selectedLetter = letter;
+        document.querySelectorAll('.letter-btn').forEach(btn => {
+            btn.classList.toggle('selected', btn.innerText === letter);
+        });
+    }
+
+    function handleCellClick(r, c) {
+        if (!gameActive || aiThinking) return;
+        if (gameMode === 'online' && !isHost && currentPlayer === 1) return; 
+        if (gameMode === 'online' && isHost && currentPlayer === 2) return;
+        if (gameMode === 'computer' && currentPlayer !== 1) return;
+        if (board[r][c] !== null) return;
+
+        placeMove(r, c, selectedLetter);
+        if (gameMode === 'online') conn.send({ type: 'move', r, c, letter: selectedLetter });
+    }
+
+    function placeMove(r, c, letter, isAI = false) {
+        board[r][c] = letter;
+        const cell = document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+        cell.innerText = letter;
+        cell.classList.add(letter.toLowerCase(), 'last-move');
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('last-move'));
+
+        const scoreResult = checkForSOS(r, c, letter);
+        const points = scoreResult.points;
+        const patterns = scoreResult.patterns;
+        
+        if (points > 0) {
+            scores[currentPlayer] += points;
+            updateScoreboard();
+            resetTimer(); 
+            
+            if (points > 1) {
+                document.getElementById('status-msg').innerText = `🔥 COMBO! +${points} Points!`;
+                document.getElementById('status-msg').style.color = "#FF6B6B";
+                showComboEffect(r, c, points);
+            } else {
+                document.getElementById('status-msg').innerText = `✨ Scored! +${points}`;
+                document.getElementById('status-msg').style.color = "#4ECDC4";
+            }
+            
+            patterns.forEach(pattern => highlightScoredPattern(pattern));
+            
+            if (gameMode === 'computer' && currentPlayer === 2) {
+                aiThinking = true;
+                setTimeout(computerMove, 800);
+                return;
+            }
+        } else {
+            switchTurn();
+        }
+        checkWinCondition();
+    }
+
+    function showComboEffect(r, c, points) {
+        const container = document.getElementById('grid-container');
+        const cell = document.getElementById(`cell-${r}-${c}`);
+        const rect = cell.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        const comboEl = document.createElement('div');
+        comboEl.classList.add('combo-text');
+        comboEl.innerText = points > 2 ? "MEGA COMBO!" : "COMBO!";
+        comboEl.style.left = (rect.left - containerRect.left) + 'px';
+        comboEl.style.top = (rect.top - containerRect.top - 20) + 'px';
+        container.appendChild(comboEl);
+        setTimeout(() => comboEl.remove(), 1000);
+    }
+
+    function highlightScoredPattern(pattern) {
+        pattern.cells.forEach(cell => {
+            document.getElementById(`cell-${cell.r}-${cell.c}`).classList.add('scored');
+        });
+        drawStrikeLine(pattern);
+        scoredPatterns.push(pattern);
+    }
+
+    function drawStrikeLine(pattern) {
+        const container = document.getElementById('grid-container');
+        const cells = pattern.cells;
+        const first = document.getElementById(`cell-${cells[0].r}-${cells[0].c}`);
+        const last = document.getElementById(`cell-${cells[2].r}-${cells[2].c}`);
+        
+        const cRect = container.getBoundingClientRect();
+        const fRect = first.getBoundingClientRect();
+        const lRect = last.getBoundingClientRect();
+        
+        const x1 = fRect.left - cRect.left + fRect.width/2;
+        const y1 = fRect.top - cRect.top + fRect.height/2;
+        const x2 = lRect.left - cRect.left + lRect.width/2;
+        const y2 = lRect.top - cRect.top + lRect.height/2;
+        
+        const len = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+        const angle = Math.atan2(y2-y1, x2-x1) * 180 / Math.PI;
+        
+        const line = document.createElement('div');
+        line.classList.add('strike-line');
+        line.style.height = '6px';
+        line.style.width = (len + 10) + 'px';
+        line.style.left = (x1 - 5) + 'px';
+        line.style.top = (y1 - 3) + 'px';
+        line.style.transformOrigin = 'left center';
+        line.style.transform = `rotate(${angle}deg)`;
+        container.appendChild(line);
+    }
+
+    function checkForSOS(r, c, letter) {
+        let points = 0;
+        let patterns = [];
+        const dirs = [
+            { name: 'horizontal', dr: 0, dc: 1 },
+            { name: 'vertical', dr: 1, dc: 0 },
+            { name: 'diagonal-1', dr: 1, dc: 1 },
+            { name: 'diagonal-2', dr: 1, dc: -1 }
+        ];
+
+        if (letter === 'O') {
+            dirs.forEach(dir => {
+                let r1 = r + dir.dr, c1 = c + dir.dc;
+                let r2 = r - dir.dr, c2 = c - dir.dc;
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === 'S' && board[r2][c2] === 'S') {
+                        points++;
+                        patterns.push({ cells: [{r:r2,c:c2}, {r,c}, {r:r1,c:c1}], direction: dir.name });
+                    }
+                }
+            });
+        } else if (letter === 'S') {
+            dirs.forEach(dir => {
+                let r1 = r + dir.dr, c1 = c + dir.dc;
+                let r2 = r + (dir.dr*2), c2 = c + (dir.dc*2);
+                if (isValid(r1, c1) && isValid(r2, c2)) {
+                    if (board[r1][c1] === 'O' && board[r2][c2] === 'S') {
+                        points++;
+                        patterns.push({ cells: [{r,c}, {r:r1,c:c1}, {r:r2,c:c2}], direction: dir.name });
+                    }
+                }
+            });
+        }
+        return { points, patterns };
+    }
+
+    function isValid(r, c) { return r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE; }
+
+    function switchTurn() {
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        updateTurnUI();
+        resetTimer();
+        document.getElementById('status-msg').innerText = "";
+        aiThinking = false;
+        if (gameMode === 'computer' && currentPlayer === 2 && gameActive) {
+            aiThinking = true;
+            setTimeout(computerMove, 800);
+        }
+    }
+
+    function updateTurnUI() {
+        const p1 = document.getElementById('p1-card');
+        const p2 = document.getElementById('p2-card');
+        if (currentPlayer === 1) {
+            p1.classList.add('active-turn'); p2.classList.remove('active-turn');
+            document.getElementById('controls').style.opacity = "1";
+            document.getElementById('controls').style.pointerEvents = "auto";
+        } else {
+            p1.classList.remove('active-turn'); p2.classList.add('active-turn');
+            if (gameMode === 'computer' || (gameMode === 'online' && !isHost)) {
+                document.getElementById('controls').style.opacity = "0.5";
+                document.getElementById('controls').style.pointerEvents = "none";
+            } else {
+                document.getElementById('controls').style.opacity = "1";
+                document.getElementById('controls').style.pointerEvents = "auto";
+            }
+        }
+    }
+
+    function updateScoreboard() {
+        document.getElementById('p1-score').innerText = scores[1];
+        document.getElementById('p2-score').innerText = scores[2];
+    }
+
+    function resetTurn() {
+        currentPlayer = 1;
+        scores = { 1: 0, 2: 0 };
+        updateScoreboard();
+        updateTurnUI();
+        aiThinking = false;
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 30;
+        document.getElementById('timer').innerText = timeLeft;
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) switchTurn();
+        }, 1000);
+    }
+
+    function resetTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 30;
+        document.getElementById('timer').innerText = timeLeft;
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) switchTurn();
+        }, 1000);
+    }
+
+    function checkWinCondition() {
+        let full = true;
+        for(let r=0; r<GRID_SIZE; r++) for(let c=0; c<GRID_SIZE; c++) if(board[r][c] === null) full = false;
+        if (full) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            aiThinking = false;
+            let msg = scores[1] > scores[2] ? "Player 1 Wins! 🏆" : scores[2] > scores[1] ? "Player 2 Wins! 🏆" : "Draw! 🤝";
+            alert(`Game Over! ${msg}`);
+        }
+    }
+
+    // === DYNAMIC ADAPTIVE AI ===
+    function computerMove() {
+        if (!gameActive || currentPlayer !== 2) { aiThinking = false; return; }
+        
+        // Analyze current board state
+        analyzeBoard();
+        
+        let emptySpots = [];
+        for(let r=0; r<GRID_SIZE; r++) {
+            for(let c=0; c<GRID_SIZE; c++) {
+                if(board[r][c] === null) emptySpots.push({r,c});
+            }
+        }
+        
+        if(emptySpots.length === 0) { aiThinking = false; return; }
+
+        // Determine game phase dynamically
+        const totalMoves = (GRID_SIZE * GRID_SIZE) - emptySpots.length;
+        const gamePhase = getGamePhase(totalMoves);
+        
+        let bestMove = null;
+        let bestScore = -Infinity;
+        let bestMoves = [];
+
+        // Evaluate each possible move with adaptive weights
+        for (let spot of emptySpots) {
+            ['S', 'O'].forEach(letter => {
+                let score = evaluateMoveAdaptive(spot.r, spot.c, letter, gamePhase);
+                
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = { r: spot.r, c: spot.c, letter };
+                    bestMoves = [{ r: spot.r, c: spot.c, letter }];
+                } else if (Math.abs(score - bestScore) < 20) {
+                    bestMoves.push({ r: spot.r, c: spot.c, letter });
+                }
+            });
+        }
+
+        // Add randomness among top moves
+        if (bestMoves.length > 1) {
+            bestMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        }
+
+        if (bestMove) {
+            placeMove(bestMove.r, bestMove.c, bestMove.letter, true);
+        }
+    }
+
+    function getGamePhase(totalMoves) {
+        if (totalMoves < 30) return 'early';
+        if (totalMoves < 70) return 'mid';
+        return 'late';
+    }
+
+    function analyzeBoard() {
+        // Count patterns and opportunities on the board
+        boardAnalysis = {
+            sCount: 0,
+            oCount: 0,
+            sosOpportunities: 0,
+            trapPatterns: 0,
+            centerControl: 0
+        };
+
+        for(let r=0; r<GRID_SIZE; r++) {
+            for(let c=0; c<GRID_SIZE; c++) {
+                if(board[r][c] === 'S') boardAnalysis.sCount++;
+                if(board[r][c] === 'O') boardAnalysis.oCount++;
+                
+                // Check for potential SOS patterns
+                if(board[r][c] === null) {
+                    board[r][c] = 'O';
+                    const scoreO = checkForSOS(r, c, 'O');
+                    board[r][c] = null;
+                    if(scoreO.points > 0) boardAnalysis.sosOpportunities++;
+                    
+                    board[r][c] = 'S';
+                    const scoreS = checkForSOS(r, c, 'S');
+                    board[r][c] = null;
+                    if(scoreS.points > 0) boardAnalysis.sosOpportunities++;
+                }
+                
+                // Check center control
+                if(r >= 3 && r <= 6 && c >= 3 && c <= 6 && board[r][c] !== null) {
+                    boardAnalysis.centerControl++;
+                }
+            }
+        }
+    }
+
+    function evaluateMoveAdaptive(r, c, letter, gamePhase) {
+        let score = 0;
+        board[r][c] = letter;
+
+        // === 1. IMMEDIATE SCORING (Highest Priority) ===
+        const scoreResult = checkForSOS(r, c, letter);
+        if (scoreResult.points > 0) {
+            const trapRisk = calculateTrapRisk(r, c, letter);
+            
+            // Base score for points
+            score += scoreResult.points * 2500;
+            
+            // Bonus for extra turn
+            score += 1500;
+            
+            // Massive bonus for combos (reusing letters)
+            if (scoreResult.points > 1) {
+                score += 4000;
+            }
+            
+            // Reduce score if creates traps
+            if (trapRisk > 0) {
+                score -= trapRisk * 1000;
+            }
+        }
+
+        // === 2. PATTERN RECOGNITION & COMPLETION ===
+        // Look for existing patterns that can be completed
+        const patternCompletion = findPatternCompletion(r, c, letter);
+        score += patternCompletion * 900;
+
+        // === 3. CREATE FUTURE OPPORTUNITIES ===
+        const setupScore = calculateSetupOpportunities(r, c, letter);
+        
+        // Weight setup based on game phase
+        if (gamePhase === 'early') {
+            score += setupScore * 600; // High priority early
+        } else if (gamePhase === 'mid') {
+            score += setupScore * 400; // Medium priority mid
+        } else {
+            score += setupScore * 200; // Low priority late
+        }
+
+        // === 4. BLOCK OPPONENT ===
+        const blockScore = calculateBlockOpportunities(r, c, letter);
+        score += blockScore * 700;
+
+        // === 5. AVOID TRAPS ===
+        const trapRisk = calculateTrapRisk(r, c, letter);
+        score -= trapRisk * 1200; // Heavy penalty
+
+        // === 6. BOARD POSITION (Adaptive to game phase) ===
+        const positionScore = evaluatePositionAdaptive(r, c, letter, gamePhase);
+        score += positionScore * 400;
+
+        // === 7. CHAIN REACTION POTENTIAL ===
+        const chainScore = calculateChainPotential(r, c, letter);
+        score += chainScore * 800;
+
+        // === 8. LETTER BALANCE ===
+        const letterBalance = evaluateLetterBalance(letter);
+        score += letterBalance * 300;
+
+        // === 9. OPPONENT SCORE DIFFERENCE ===
+        const scoreDiff = scores[1] - scores[2];
+        if (scoreDiff > 0 && gamePhase === 'late') {
+            // If behind late game, take more risks
+            score += 500;
+        }
+
+        board[r][c] = null;
+        
+        // Small randomness for unpredictability
+        score += Math.random() * 50;
+
+        return score;
+    }
+
+    function findPatternCompletion(r, c, letter) {
+        let completions = 0;
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+
+        if (letter === 'O') {
+            // O completes S _ S
+            dirs.forEach(d => {
+                let r1 = r + d[0], c1 = c + d[1];
+                let r2 = r - d[0], c2 = c - d[1];
+                if (isValid(r1,c1) && isValid(r2,c2)) {
+                    if (board[r1][c1] === 'S' && board[r2][c2] === 'S') {
+                        completions += 5; // Can score immediately
+                    }
+                }
+            });
+        }
+
+        if (letter === 'S') {
+            // S completes S O _ or _ O S
+            dirs.forEach(d => {
+                let r1 = r + d[0], c1 = c + d[1];
+                let r2 = r + d[0]*2, c2 = c + d[1]*2;
+                if (isValid(r1,c1) && isValid(r2,c2)) {
+                    if (board[r1][c1] === 'O' && board[r2][c2] === 'S') {
+                        completions += 5; // Can score immediately
+                    }
+                    if (board[r1][c1] === 'O' && board[r2][c2] === null) {
+                        completions += 2; // One step away
+                    }
+                }
+            });
+        }
+
+        return completions;
+    }
+
+    function calculateSetupOpportunities(r, c, letter) {
+        let opportunities = 0;
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+
+        if (letter === 'S') {
+            dirs.forEach(d => {
+                let r1 = r + d[0], c1 = c + d[1];
+                let r2 = r + d[0]*2, c2 = c + d[1]*2;
+                if (isValid(r1,c1) && isValid(r2,c2)) {
+                    if (board[r1][c1] === null && board[r2][c2] === null) {
+                        opportunities += 1; // S _ _
+                    }
+                    if (board[r1][c1] === null && board[r2][c2] === 'S') {
+                        opportunities += 2; // S _ S (risky but potential)
+                    }
+                    if (board[r1][c1] === 'O' && board[r2][c2] === null) {
+                        opportunities += 3; // S O _ (very close)
+                    }
+                }
+            });
+        }
+
+        if (letter === 'O') {
+            dirs.forEach(d => {
+                let r1 = r + d[0], c1 = c + d[1];
+                let r2 = r - d[0], c2 = c - d[1];
+                if (isValid(r1,c1) && isValid(r2,c2)) {
+                    if (board[r1][c1] === null && board[r2][c2] === null) {
+                        opportunities += 1; // _ O _
+                    }
+                    if ((board[r1][c1] === 'S' && board[r2][c2] === null) ||
+                        (board[r1][c1] === null && board[r2][c2] === 'S')) {
+                        opportunities += 3; // S O _ or _ O S
+                    }
+                }
+            });
+        }
+
+        return opportunities;
+    }
+
+    function calculateBlockOpportunities(r, c, letter) {
+        let blocked = 0;
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+
+        dirs.forEach(d => {
+            let r1 = r + d[0], c1 = c + d[1];
+            let r2 = r + d[0]*2, c2 = c + d[1]*2;
+
+            if (isValid(r1,c1) && isValid(r2,c2)) {
+                // Block S _ S
+                if (board[r1][c1] === null && board[r2][c2] === 'S' && letter === 'S') {
+                    blocked += 2;
+                }
+                // Block S O _
+                if (board[r1][c1] === 'S' && board[r2][c2] === null && letter === 'O') {
+                    blocked += 2;
+                }
+            }
+        });
+
+        return blocked;
+    }
+
+    function calculateTrapRisk(r, c, letter) {
+        let risk = 0;
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+
+        if (letter === 'S') {
+            dirs.forEach(d => {
+                let r2 = r + d[0]*2, c2 = c + d[1]*2;
+                let rMid = r + d[0], cMid = c + d[1];
+                if (isValid(r2,c2) && isValid(rMid,cMid)) {
+                    if (board[r2][c2] === 'S' && board[rMid][cMid] === null) {
+                        risk += 3; // S _ S is very dangerous
+                    }
+                }
+            });
+        }
+
+        if (letter === 'O') {
+            dirs.forEach(d => {
+                let r1 = r + d[0], c1 = c + d[1];
+                let r2 = r + d[0]*2, c2 = c + d[1]*2;
+                if (isValid(r1,c1) && isValid(r2,c2)) {
+                    if (board[r1][c1] === 'S' && board[r2][c2] === null) {
+                        risk += 2; // S O _ is moderately dangerous
+                    }
+                }
+            });
+        }
+
+        return risk;
+    }
+
+    function evaluatePositionAdaptive(r, c, letter, gamePhase) {
+        let value = 0;
+        const center = GRID_SIZE / 2;
+        const distanceFromCenter = Math.abs(r - center) + Math.abs(c - center);
+        
+        if (gamePhase === 'early') {
+            // Early: Control center strongly
+            value += Math.max(0, 6 - distanceFromCenter) * 2;
+            if (r >= 3 && r <= 6 && c >= 3 && c <= 6) value += 5;
+        } else if (gamePhase === 'mid') {
+            // Mid: Balance center and edges
+            value += Math.max(0, 4 - distanceFromCenter);
+        } else {
+            // Late: Avoid edges, focus on scoring positions
+            if (r === 0 || r === GRID_SIZE - 1) value -= 3;
+            if (c === 0 || c === GRID_SIZE - 1) value -= 3;
+        }
+
+        return value;
+    }
+
+    function calculateChainPotential(r, c, letter) {
+        let chain = 0;
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+
+        // Check if this move creates opportunities for immediate follow-up scores
+        dirs.forEach(d => {
+            let r1 = r + d[0], c1 = c + d[1];
+            if (isValid(r1, c1) && board[r1][c1] === null) {
+                // Simulate next move
+                board[r1][c1] = letter === 'S' ? 'O' : 'S';
+                const nextScore = checkForSOS(r1, c1, board[r1][c1]);
+                if (nextScore.points > 0) {
+                    chain += nextScore.points;
+                }
+                board[r1][c1] = null;
+            }
+        });
+
+        return chain;
+    }
+
+    function evaluateLetterBalance(letter) {
+        // Prefer balanced S and O usage
+        const diff = Math.abs(boardAnalysis.sCount - boardAnalysis.oCount);
+        
+        if (letter === 'S' && boardAnalysis.sCount < boardAnalysis.oCount) {
+            return 2; // Need more S
+        }
+        if (letter === 'O' && boardAnalysis.oCount < boardAnalysis.sCount) {
+            return 2; // Need more O
+        }
+        
+        return 0;
+    }
+
+    // === ONLINE ===
+    function showOnlineMenu() { document.getElementById('online-modal').style.display = 'flex'; initPeer(); }
+    function closeOnlineMenu() { document.getElementById('online-modal').style.display = 'none'; }
+    function initPeer() {
+        peer = new Peer();
+        peer.on('open', id => document.getElementById('network-status').innerText = "Ready.");
+        peer.on('connection', c => {
+            conn = c; isHost = true;
+            document.getElementById('network-status').innerText = "Connected!";
+            setTimeout(() => { closeOnlineMenu(); startGame('online'); }, 1000);
+        });
+    }
+    function createRoom() {
+        if(!peer) return;
+        document.getElementById('room-id-display').innerText = peer.id;
+        document.getElementById('room-id-container').classList.remove('hidden');
+        document.getElementById('btn-copy').disabled = false;
+        document.getElementById('btn-share').disabled = false;
+    }
+    function joinRoom() {
+        const id = document.getElementById('remote-id-input').value;
+        if(!id) return alert("Enter ID");
+        conn = peer.connect(id); isHost = false;
+        conn.on('open', () => {
+            document.getElementById('network-status').innerText = "Joined!";
+            setTimeout(() => { closeOnlineMenu(); startGame('online'); }, 1000);
+        });
+    }
+    function setupConnectionHandlers() {
+        conn.on('data', data => { if (data.type === 'move') placeMove(data.r, data.c, data.letter); });
+    }
+    function copyId() {
+        navigator.clipboard.writeText(document.getElementById('room-id-display').innerText);
+        const btn = document.getElementById('btn-copy');
+        const orig = btn.innerText; btn.innerText = "Copied!";
+        setTimeout(() => btn.innerText = orig, 2000);
+    }
+    function shareId() {
+        const text = `Join my SOS game! ID: ${document.getElementById('room-id-display').innerText}`;
+        if (navigator.share) navigator.share({ title: 'SOS Game', text, url: window.location.href });
+        else { copyId(); alert("Copied to clipboard!"); }
+    }
+</script>
+</body>
+</html>
